@@ -51,15 +51,54 @@ Use documented props only:
 - `events`
 - `view`
 - `date`
-- `config`
-- `templates`
-- `xy`
+- `markers`
+- `plugins`
 - `data`
-- `customLightbox`
-- `modals`
+- `locale`
+- `theme`
+- `templates`
+- `config`
+- `xy`
 - `filter`
+- `modals`
+- `eventBoxRenderer`
+- `views`
+- `customViews`
+- `customLightbox`
+- `templateWrapper`
 - `on<EventName>`
 - `ref`
+
+## Plugins
+
+`plugins` is a **prop**. The core `scheduler.plugins({...})` instance method is still available through the ref and is fully supported, but the prop form is tidier and requires less code — prefer it from the React wrapper.
+
+```tsx
+import { type SchedulerPlugins } from "@dhx/react-scheduler";
+
+const plugins: SchedulerPlugins = { recurring: true, collision: true };
+
+<ReactScheduler events={events} plugins={plugins} />
+```
+
+Commonly used keys (grouped by purpose):
+- features: `recurring`, `collision`, `limit`, `readonly`, `tooltip`, `quick_info`, `multiselect`, `multisection`, `drag_between`, `all_timed`, `active_links`, `container_autoresize`, `key_nav`, `editors`
+- views (each requires its plugin): `agenda_view`, `daytimeline`, `grid_view`, `map_view`, `minical`, `timeline`, `treetimeline`, `units`, `week_agenda`, `year_view`
+
+Plugin dependencies — verify with MCP before combining:
+- `treetimeline` requires `timeline`
+- `daytimeline` requires `timeline`
+- recurring lightbox section requires `recurring`
+
+## Views
+
+Core views (work in all editions): `day`, `week`, `month`, `year`, `agenda`, `weekagenda`, `grid`, `map`.
+
+Pro/Enterprise/Ultimate-only views: `timeline`, `units` (and the timeline variants `treetimeline`, `daytimeline`). Each Pro view requires its plugin enabled on the `plugins` prop and a configuration entry. Feature-gate UI when the build is not Pro.
+
+- `view` prop selects the active view by name.
+- `views` prop registers configurations for the available views (timeline/units/grid use the `TimelineViewConfig`, `UnitsViewConfig`, `GridViewConfig` shapes exported from the wrapper).
+- `customViews` prop registers user-defined view definitions.
 
 ## Ref Access
 
@@ -74,15 +113,14 @@ If you mutate data through the instance while also passing `events` as props, ke
 
 ## Theme Rule
 
-Use the app theme as the single source of truth.
+Use the app theme as the single source of truth. Pass the skin through the `theme` **prop**, not through `setSkin()` on the instance.
 
-Example:
+Built-in skins: `terrace` (default), `dark`, `material`, `flat`, `contrast_black`, `contrast_white`.
+
+Typical mapping:
 ```tsx
-useEffect(() => {
-  const scheduler = schedulerRef.current?.instance;
-  if (!scheduler) return;
-  scheduler.setSkin(appTheme === "dark" ? "dark" : "terrace");
-}, [appTheme]);
+const schedulerTheme = appTheme === "dark" ? "dark" : "terrace";
+<ReactScheduler theme={schedulerTheme} ... />
 ```
 
 Do not introduce separate Scheduler-only theme state if the app already has a global theme source.
