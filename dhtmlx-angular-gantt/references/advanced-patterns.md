@@ -69,10 +69,13 @@ Separate assignments list:
 }
 ```
 
+`value` represents allocated workload in the project's duration unit (typically hours). If the workload template aggregates differently (percent allocation, days, etc.), make the unit explicit at the persistence boundary so backend and template render the same scale.
+
 ## Undo/Redo With State Management
 
 - use fresh state/store snapshots inside `data.save` callbacks — do not rely on stale captured values
 - if using RxJS store, NgRx, or another external store for Gantt history, normalize all date values before writing to the store (state must be serializable)
+- clone tasks and links shallowly with spread (`{ ...task }`) and `structuredClone` the config when capturing a history snapshot — enough to isolate undo/redo from subsequent edits without paying for a deep clone on every commit
 - undo and redo actions must also update persistence — client-only history creates data gaps on reload
 - persist history snapshots when rehydration across sessions is required
 - save or refetch operations must not wipe the undo/redo history stack

@@ -78,7 +78,6 @@ Use documented inputs only:
 - `groupTasks`
 - `filter`
 - `resourceFilter`
-- `allowRawHTML`
 
 ## Events And Ready
 
@@ -138,6 +137,45 @@ Template usage:
 The `theme` input can be updated at runtime; keep it bound to app-level state/store so Gantt follows light/dark changes automatically.
 
 Do not introduce separate Gantt-only theme state if the app already has a global theme source.
+
+## Resources And Calendars
+
+When implementing resources:
+- pass the resource dataset through the `[resources]` input
+- pair it with `[resourceAssignments]` when assignments live in a separate datastore
+- keep resource IDs and task assignment fields consistent across both inputs
+- derive display labels from the same persisted field used for editing
+- include an explicit unassigned option when needed
+- keep the resource grid, resource timeline, and workload views tied to the same source of truth
+
+When implementing working time:
+- keep one source of truth for working and non-working time rules
+- pass calendar definitions through the `[calendars]` input; calendars are synchronized by `id`, so keep IDs stable across reloads
+- use documented templates (`timeline_cell_class`, `task_cell_class`) for non-working-day styling
+- do not infer calendar engine behavior — verify with MCP if a rule is unclear
+
+## Plugins
+
+Activate documented plugins through the `[plugins]` input. Each plugin is a key on the map; pass `true` to enable.
+
+```html
+<dhx-gantt
+  [tasks]="tasks"
+  [links]="links"
+  [plugins]="{ auto_scheduling: true, critical_path: true }">
+</dhx-gantt>
+```
+
+Common plugins: `auto_scheduling`, `critical_path`. Advanced plugin behavior (scheduling rules, workload calculation, overload thresholds) is not derivable from the input shape alone — verify expected behavior with MCP before relying on it.
+
+## Markers, Baselines, Filter, Locale
+
+Additional documented inputs for advanced timelines:
+
+- `[markers]` (`Marker[] | null`): vertical timeline markers synchronized by `id`. Keep marker IDs stable so updates patch the existing marker rather than replacing the set.
+- `[baselines]` (`any[] | null`): baseline dataset for planned-vs-actual comparison. Treat baselines as immutable alongside the live task set; do not mutate them through `data.save`.
+- `[filter]` (`TaskFilter`): `(task) => boolean` predicate, or `null` to show all. Keep a stable reference when the filter logic has not changed — the wrapper compares by identity and re-renders only when the reference changes.
+- `[locale]` (`string | null`): locale name passed to `gantt.i18n.setLocale(...)`. Bind it to app-level locale state so Gantt follows app i18n changes automatically.
 
 ## Config And Templates
 

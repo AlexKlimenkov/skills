@@ -1,6 +1,6 @@
 # Styling And Theming
 
-Use this file when theming Gantt, matching an app design system, or styling tasks, links, rows, and resource views.
+Use this file when theming Gantt, matching an app design system, or styling tasks, links, rows, calendar cells, and resource views.
 
 ## Contents
 - Styling Priority
@@ -22,8 +22,6 @@ Use this order by default:
 
 CSS variables are the preferred customization path.
 
-Use app theme as single source of truth and map to Gantt `theme` input:
-
 Define shared variables at `:root` so inheritance works correctly across the whole component:
 
 ```css
@@ -35,8 +33,6 @@ Define shared variables at `:root` so inheritance works correctly across the who
   --dhx-gantt-task-color: #ffffff;
 }
 ```
-
-Place `:root` declarations in a global stylesheet (for example `src/styles.css`). Component-scoped stylesheets are isolated by Angular's view encapsulation, so `:root` variables defined inside them will not reach the Gantt DOM — drop encapsulation with `ViewEncapsulation.None` or move the variables to global styles. See [angular-integration.md § CSS Placement Rule](./angular-integration.md).
 
 ### High-Impact Variables
 
@@ -51,6 +47,7 @@ Typography and surfaces:
 - `--dhx-gantt-popup-background`
 - `--dhx-gantt-popup-color`
 - `--dhx-gantt-popup-border`
+
 
 Primary and semantic colors:
 - `--dhx-gantt-base-colors-primary`
@@ -77,38 +74,28 @@ Rows, links:
 - `--dhx-gantt-task-row-background--odd`
 - `--dhx-gantt-link-background`
 
-### Map App Tokens To Gantt Tokens
-
-Use the app theme as the source of truth instead of inventing Gantt-only colors:
-- app accent -> `--dhx-gantt-base-colors-primary`
-- app surface -> `--dhx-gantt-container-background`
-- app body text -> `--dhx-gantt-container-color` and `--dhx-gantt-base-colors-text-base`
-- app border -> `--dhx-gantt-base-colors-border` and `--dhx-gantt-base-colors-border-light`
-- app selected state -> `--dhx-gantt-base-colors-select`
-- app hover state -> `--dhx-gantt-base-colors-hover-color` 
-- app on-accent text -> `--dhx-gantt-task-color` and `--dhx-gantt-project-color`
-
 ## Use Config For Size And Geometry
 
 Some visible styling is controlled by Gantt config, not CSS:
-- `config.row_height`
-- `config.scale_height`
-- `config.link_line_width`
-- `config.link_radius`
-- `config.link_arrow_size`
+
+```ts
+gantt.config.row_height = 32;
+gantt.config.bar_height = 20;
+gantt.config.grid_width = 360;
+gantt.config.scale_height = 50;
+```
 
 ## Data-Driven Styling
 
-When styling depends on task, link, resource, or calendar data, prefer templates.
+When styling depends on task, link, or calendar data, prefer templates.
 
 ### Tasks
 
-Use `task_class` for semantic task styling:
+Prefer `task_class` to style groups of tasks by priority, status, owner, or any other semantic field:
 
-```ts
-templates = {
-  task_class: (_start: Date, _end: Date, task: any) =>
-    task.priority ? `priority_${task.priority}` : "",
+```js
+gantt.templates.task_class = (start, end, task) => {
+  return task.priority ? `priority_${task.priority}` : "";
 };
 ```
 
@@ -119,7 +106,7 @@ templates = {
 }
 ```
 
-Supported task shortcut color fields:
+Supported task color shortcut fields:
 - `color`
 - `textColor`
 - `progressColor`
@@ -136,11 +123,11 @@ Advanced pattern:
 
 ### Links
 
-Use `link_class` to style links by dependency type or link metadata:
+Prefer `link_class` to style links by dependency type or link metadata:
 
-```ts
-templates = {
-  link_class: (link: any) => (link.type === "0" ? "finish_to_start" : ""),
+```js
+gantt.templates.link_class = (link) => {
+  return link.type === "0" ? "finish_to_start" : "";
 };
 ```
 
@@ -150,7 +137,7 @@ templates = {
 }
 ```
 
-Supported link shortcut color field:
+Supported link color shortcut field:
 - `color`
 
 The same caveat applies:
@@ -158,28 +145,13 @@ The same caveat applies:
 - inline style overrides other CSS
 - critical-link styling and custom classes may not show as expected when inline color is present
 
-### Rows, Timeline Cells, Resource Cells
+### Rows And Timeline Cells
 
-Use template callbacks first:
-- `grid_row_class`
-- `timeline_cell_class`
-- `resource_cell_class`
-- `resource_cell_value`
+Use templates for semantic row or cell styling:
+- `grid_row_class` for specific grid rows
+- `timeline_cell_class` for timeline cells such as weekends or non-working time
 
-Use selectors only when styling is structural rather than data-driven.
-
-### Angular Template Components
-
-Use `templateComponent(...)` for Angular-rendered templates.
-
-```ts
-import { templateComponent } from "@dhtmlx/trial-angular-gantt";
-
-templates = {
-  task_text: (_start: Date, _end: Date, task: any) =>
-    templateComponent(TaskBadgeComponent, { task }),
-};
-```
+Use selectors alone only when the styling is purely structural and not data-driven.
 
 ## Common Selectors And Escape Hatches
 

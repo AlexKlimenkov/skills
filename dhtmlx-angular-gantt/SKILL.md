@@ -6,12 +6,8 @@ description: >
   row reorder, sortorder, and Angular wrapper integration patterns for
   @dhtmlx/trial-angular-gantt and @dhx/angular-gantt. Applies when working with gantt charts,
   project timelines, task dependencies, task CRUD, resource panels, working calendars,
-  lightboxes, or weekend highlighting in Angular. Provides verified API guidance rather
-  than guessing Angular Gantt APIs.
-paths: "**/*.ts,**/*.html,**/*.css,**/*.scss,angular.json,package.json"
-allowed-tools: Read Grep
-metadata:
-  tags: dhtmlx, gantt, angular, dependencies, baselines, milestones, resources
+  lightboxes, or weekend highlighting in Angular — regardless of whether "DHTMLX" is
+  mentioned by name. Provides verified API guidance rather than guessing Angular Gantt APIs.
 ---
 
 ## Source Of Truth
@@ -67,7 +63,7 @@ If MCP is not available, use the official docs at https://docs.dhtmlx.com/gantt/
 
 Consult DHTMLX MCP before using or changing:
 - template callbacks you have not already verified
-- advanced inputs such as `batchSave`, `customLightbox`, `groupTasks`, `resourceFilter`, or `allowRawHTML`
+- advanced inputs such as `batchSave`, `customLightbox`, `groupTasks`, or `resourceFilter`
 - `events` callback signatures beyond commonly used handlers
 - theme/skin names beyond known project usage
 - complex layout/resource panel definitions (`resourceGrid`, `resourceTimeline`, shared scroll)
@@ -78,6 +74,7 @@ Consult DHTMLX MCP before using or changing:
 - Use wrapper path (`<dhx-gantt>`) by default for Angular tasks.
 - The Gantt container must have explicit height through the parent chain.
 - Use app theme as single source of truth; map it to Gantt theme.
+- Prefer CSS variables and documented templates before selector-heavy overrides.
 - Keep tasks/links in Angular state/store when surrounding UI depends on chart state.
 - Normalize date values before persistence.
 - Build backend payloads explicitly from normalized app task/link models.

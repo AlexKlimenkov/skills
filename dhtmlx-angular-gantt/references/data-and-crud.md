@@ -81,6 +81,29 @@ Strict rules:
 - do not send links that reference temporary IDs to the backend
 - build backend payloads explicitly from normalized task/link models, not from raw callback objects
 
+## Date Normalization
+
+`data.save` and `data.batchSave` callbacks can hand back either `Date` instances or formatted strings depending on how Gantt renders and parses dates. Pin both directions with `parse_date` and `format_date` templates so persistence always sees ISO strings, regardless of input shape.
+
+```ts
+import type { AngularGanttTemplates } from "@dhtmlx/trial-angular-gantt";
+
+templates: AngularGanttTemplates = {
+  parse_date: (value: string | Date) => this.parseDate(value),
+  format_date: (date: string | Date) => this.formatDate(date),
+};
+
+private parseDate(value: string | Date): Date {
+  return value instanceof Date ? value : new Date(value);
+}
+
+private formatDate(value: string | Date): string {
+  return this.parseDate(value).toISOString();
+}
+```
+
+Pass these templates to `<dhx-gantt>` once at the page/feature root. With both templates in place, dates round-trip as ISO strings through `data.save`/`data.batchSave` and through any state/store layer in between, even when Gantt internally serializes them.
+
 ## When To Use `batchSave`
 
 Use `data.batchSave` when:
@@ -101,6 +124,14 @@ dataConfig: AngularGanttDataConfig = {
 
 Do not switch to `batchSave` casually. Verify the exact expected behavior with MCP first.
 
+Queue behavior (do not assume one DOM gesture = one persisted change):
+- changes are batched within a short debounce window
+- `create` + `update` for the same entity coalesce into a single `create` with the latest payload
+- `create` + `delete` pairs are dropped entirely
+- the wrapper strips internal `!nativeeditor_status` from payloads before invoking the callback
+
+Plan persistence around the *post-coalescing* change set, not the user-visible action count.
+
 ## ID Remapping And Temporary IDs
 
 Create flows often start with temporary client-side IDs.
@@ -110,6 +141,47 @@ Rules:
 - in `save` mode, return `{ id: dbId }` or `{ tid: dbId }` so Gantt can remap
 - do not persist links that reference temporary task IDs
 - replace temporary IDs deterministically in state after create confirmation
+
+## State Service Pattern (RxJS)
+
+When Angular owns the data, expose narrow per-concern streams from a state service rather than one wide state object, then recompose them in the component with `combineLatest` and `AsyncPipe`. The wrapper compares input identities, so narrow streams keep `<dhx-gantt>` re-binding only the inputs that actually changed.
+
+Service shape:
+```ts
+@Injectable()
+export class GanttStateService {
+  private readonly stateSubject = new BehaviorSubject<GanttState>(initial);
+
+  readonly state$ = this.stateSubject.asObservable();
+  readonly tasks$ = this.state$.pipe(map((s) => s.tasks));
+  readonly links$ = this.state$.pipe(map((s) => s.links));
+  readonly wrapperConfig$ = this.state$.pipe(map((s) => this.buildWrapperConfig(s.config)));
+  readonly zoomLevel$ = this.state$.pipe(
+    map((s) => s.config.zoom.current),
+    distinctUntilChanged(),
+  );
+  readonly canUndo$ = this.state$.pipe(map((s) => s.past.length > 0), distinctUntilChanged());
+  readonly canRedo$ = this.state$.pipe(map((s) => s.future.length > 0), distinctUntilChanged());
+}
+```
+
+Component shape:
+```ts
+protected readonly vm$ = combineLatest({
+  tasks: this.ganttState.tasks$,
+  links: this.ganttState.links$,
+  config: this.ganttState.wrapperConfig$,
+  zoomLevel: this.ganttState.zoomLevel$,
+  canUndo: this.ganttState.canUndo$,
+  canRedo: this.ganttState.canRedo$,
+});
+```
+
+Rules:
+- one `BehaviorSubject` per state shape; do not spread state across many subjects that must stay synchronized
+- derive view streams with `map` + `distinctUntilChanged` so identical references are deduplicated
+- bind through `AsyncPipe` in the template; do not subscribe manually in the component
+- route every mutation through service methods so history, persistence, and `BehaviorSubject` updates stay coherent
 
 ## Row Reorder And Sortorder
 
