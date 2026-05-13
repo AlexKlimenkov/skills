@@ -3,21 +3,41 @@
 Use this file when implementing custom views, plugins, advanced filtering, undo/redo, or scheduling safeguards.
 
 ## Contents
-- Views And Plugins As Optional Features
+- Views And Plugins
 - Resource/Section Mapping
 - Undo/Redo With State Management
 - Conflict And Availability Guards
+- Recurring Exceptions
 - Custom Fields And Backend Mapping
 
-## Views And Plugins As Optional Features
+## Views And Plugins
 
-When configuring non-trivial custom views:
-- verify required plugin set and view configuration with MCP
-- verify callback signatures and payload shapes with MCP
+Activate every non-default view through the `plugins` prop and register its configuration through the `views` prop.
+
+Units view (Pro):
+- enable with `plugins={{ units: true }}`
+- every event must carry the field named by the `property` config (for example `unit_id`)
+- pass a `UnitsViewConfig` entry via the `views` prop with `name`, `property`, and `list` ({ key, label } items)
+- `key` values in `list` and the event field type/format must match exactly
+
+Timeline view (Pro):
+- enable with `plugins={{ timeline: true }}` (and `treetimeline` or `daytimeline` for those render modes)
+- every event must carry the field named by `y_property`
+- pass a `TimelineViewConfig` entry via the `views` prop with `name`, `y_property`, `y_unit`, `x_unit`, `x_step`, plus `render` (`bar` | `cell` | `tree` | `days`)
+- `days` mode requires the time scale to cover exactly one day
+
+Grid view (core):
+- `plugins={{ grid_view: true }}`
+- pass a `GridViewConfig` via the `views` prop with `fields` (array of column definitions)
+
+Feature-gate UI when the build is not Pro — `timeline`, `units`, `treetimeline`, `daytimeline` are not available in Individual/GPL editions.
 
 ## Resource/Section Mapping
 
-- keep one canonical event field for section/resource assignment (for example `resource_id`)
+- keep one canonical event field for section/resource assignment; the field name must match the view config:
+  - units view → `property` (e.g. `unit_id`)
+  - timeline view → `y_property` (e.g. `section_id`)
+  - these are scheduler-specific names; do not borrow `resource_property` from Gantt
 - ensure section keys and event assignment values use the same ID type/format
 - map section labels from persisted data, not hardcoded display-only arrays
 - if unassigned events are supported, keep their behavior explicit in UI and persistence
@@ -25,7 +45,7 @@ When configuring non-trivial custom views:
 
 Guardrails:
 - do not silently remap unknown section IDs
-- verify timeline/section configuration details with MCP before implementation
+- verify timeline/units configuration details with MCP before implementation
 
 ## Undo/Redo With State Management
 
@@ -38,11 +58,31 @@ Guardrails:
 
 ## Conflict And Availability Guards
 
-- run conflict/availability checks before persistence when the app requires scheduling rules
-- typical checks: overlap on the same assignment field (for example `resource_id`), location scope, and business-hours window
+For simple non-overlap rules, prefer the built-in `collision` plugin instead of hand-rolled checks:
+
+```ts
+const plugins: SchedulerPlugins = { collision: true };
+const config: SchedulerConfig = { collision_limit: 1 };
+```
+
+For app-specific rules (location scope, business hours, role-based limits) keep a custom check path:
+- run checks before persistence
+- typical checks: overlap on the same assignment field (for example `unit_id`), location scope, business-hours window
 - keep the check path explicit: `candidate event -> checks -> decision -> persist`
 - if conflicts need confirmation, require explicit user confirmation before save
 - if conflicts are blocked, stop the write and keep UI state consistent with persisted state
+
+## Recurring Exceptions
+
+Editing a recurring series can produce three persistence outcomes depending on what the user picks in `modals.onRecurrenceConfirm`:
+
+- `"series"` — update the series row in place
+- `"occurrence"` — create a new exception row with `recurring_event_id` pointing at the series and `original_start` set to the original occurrence date
+- `"following"` — split the series; verify the exact split semantics with MCP
+
+Deleting a single occurrence inserts a new row with `recurring_event_id`, `original_start`, and `deleted: true` — do not remove the series row.
+
+See [data-and-crud.md](./data-and-crud.md) for the full recurring data model.
 
 ## Custom Fields And Backend Mapping
 

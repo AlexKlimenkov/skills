@@ -7,10 +7,6 @@ description: >
   Applies when working with booking calendars, resource scheduling, event CRUD, timeline/day/week/month
   views, lightboxes, or scheduling conflict checks in React apps — regardless of whether
   "DHTMLX" is mentioned by name. Provides verified API guidance rather than guessing React Scheduler APIs.
-paths: "**/*.tsx,**/*.jsx,**/*.ts,**/*.js,package.json"
-allowed-tools: Read Grep
-metadata:
-  tags: dhtmlx, scheduler, booking, calendar, resources, events
 ---
 
 ## Source Of Truth
@@ -65,19 +61,23 @@ If MCP is not available, use the official docs at https://docs.dhtmlx.com/schedu
 
 Consult DHTMLX MCP before using or changing:
 - template callbacks you have not already verified
-- advanced props such as `batchSave`, `customLightbox`, `modals`, `view`, or `filter`
-- timeline configuration details and related callback signatures
+- recurring event payload shape (`rrule`, `recurring_event_id`, `original_start`, `deleted`, `duration`) and the `modals.onRecurrenceConfirm` flow
+- `config.lightbox.sections` section types and `map_to` conventions
+- `plugins` prop keys and plugin dependencies (for example `treetimeline` requires `timeline`)
+- timeline/units view configuration (`property`, `y_property`, `x_unit`, `x_step`, `x_size`)
+- advanced props such as `batchSave`, `customLightbox`, `modals`, `views`, `customViews`, or `filter`
 - event handler signatures (`on<EventName>`) when behavior is not fully clear
-- theme/skin methods and runtime view-switch behavior via `ref` instance API
-- collision/limit/recurring plugin behavior in combined setups
+- theme/skin values supported by the `theme` prop, individual `--dhx-scheduler-*` variables and their inheritance defaults (full catalog: `scheduler-docs/docs/guides/theme-css-variables.md`), and runtime view-switch behavior via `ref` instance API
 
 ## Hard Rules
 
 - The Scheduler container must have explicit height.
 - CSS import must match the installed package and be a separate import line.
+- Activate plugins through the `plugins` prop (`plugins={{ recurring: true }}`). The core `scheduler.plugins({...})` instance method is also supported, but the prop form is tidier, requires less code, and offers no benefit to reach for the instance when the prop covers it.
+- Switch skin/theme through the `theme` prop (default `terrace`). Do not branch theme through `ref.instance.setSkin()` when the prop is wired.
 - Use the app theme as the single source of truth.
 - Prefer JavaScript `Date` objects for `start_date` and `end_date` in React-managed mode.
-- Normalize date values before persistence.
+- Normalize date values before persistence. `data.save` callbacks receive `SerializedEvent` (date strings), not `Date` instances.
 - Build backend payloads explicitly from normalized event models.
 - Do not use undocumented internals when a documented prop or ref API exists.
 - Do not mix React-managed props and imperative instance mutations unless synchronization is intentional.
@@ -87,6 +87,8 @@ Consult DHTMLX MCP before using or changing:
 - [ ] Correct package identified
 - [ ] Matching CSS import used
 - [ ] Explicit height provided
+- [ ] Required features enabled via the `plugins` prop
+- [ ] Skin selected via the `theme` prop (not `setSkin()`)
 - [ ] Data ownership model chosen
 - [ ] Dates normalized before persistence
 - [ ] Advanced APIs verified with MCP
