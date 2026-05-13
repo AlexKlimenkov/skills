@@ -3,16 +3,14 @@ name: dhtmlx-js-gantt
 description: >
   Builds and integrates core DHTMLX JavaScript Gantt into JavaScript or TypeScript
   applications. Covers setup, initialization, lifecycle, gantt.parse/gantt.load,
-  templates, DataProcessor, task/link CRUD, resources, calendars, undo/redo, row
-  reorder, sortorder, styling, and theming for @dhx/gantt and @dhx/trial-gantt.
-  Applies when working with gantt charts, project timelines, task dependencies,
-  task CRUD, resource panels, working calendars, lightboxes, workload views, or
-  weekend highlighting, regardless of whether "DHTMLX" is mentioned
-  by name. Provides verified API guidance rather than guessing core Gantt APIs.
-paths: "**/*.ts,**/*.js,**/*.html,**/*.css,package.json,vite.config.*"
-allowed-tools: Read Grep
-metadata:
-  tags: dhtmlx, gantt, dependencies, baselines, milestones, resources
+  templates, events, plugins, DataProcessor, task/link CRUD, resources, calendars,
+  undo/redo, row reorder, sortorder, baselines, critical path, locale/i18n,
+  styling, and theming for dhtmlx-gantt (Standard/GPL), @dhx/trial-gantt, and
+  @dhx/gantt. Applies when working with gantt charts, project timelines, task
+  dependencies, task CRUD, resource panels, working calendars, lightboxes,
+  workload views, baselines, or weekend highlighting, regardless of whether
+  "DHTMLX" is mentioned by name. Provides verified API guidance rather than
+  guessing core Gantt APIs and surfaces edition limits before scaffolding.
 ---
 
 ## Source Of Truth
@@ -29,20 +27,23 @@ If any core Gantt API detail is unclear, resolve it through DHTMLX MCP before wr
 ## Preflight
 
 Before writing code, identify:
-- **package**: `@dhx/gantt`, `@dhx/trial-gantt` — check `package.json`, imports, lockfiles
-- **runtime**: plain JavaScript, TypeScript, Vite, or another app setup
-- **ownership model**: app-managed data or Gantt-managed data
-- **persistence**: local only, `gantt.createDataProcessor`, or custom backend/API clients
+- **delivery**: npm package (`dhtmlx-gantt`, `@dhx/trial-gantt`, `@dhx/gantt`) — check `package.json`, imports, lockfiles. Or script tag / CDN — check `<script>` tags in HTML, vendored `dhtmlxgantt.js`, the `@license` banner inside that file, or the runtime `gantt.license` / `gantt.version` fields.
+- **edition**: `dhtmlx-gantt` and `gantt.license === "gpl"` mean Standard/GPL (PRO-only features unavailable); everything else is Professional. See [references/editions.md](references/editions.md) for the full detection procedure and the PRO-only feature list.
+- **runtime**: plain JavaScript, TypeScript, Vite, browser-only `<script>`, or another app setup
+- **outbound changes**: no persistence, `gantt.createDataProcessor`, or custom backend/API clients
+- **inbound changes**: none, hard reload (`gantt.clearAll` + `gantt.parse`), or incremental updates via `gantt.silent`-wrapped API calls — see [references/data-and-crud.md](references/data-and-crud.md). For real-time streams use `gantt.ext.liveUpdates` — see [references/live-updates.md](references/live-updates.md).
 
 ## Workflow
 
 1. Confirm the installed DHTMLX Gantt package and import path.
-2. Decide the data ownership model before implementing features.
+2. Decide the outbound and inbound change strategies before implementing CRUD or external sync.
 3. Read only the reference file needed for the task:
+   - Editions, package detection, and PRO-only feature list: [references/editions.md](references/editions.md)
    - Setup: [references/setup.md](references/setup.md)
    - CRUD, state, and persistence: [references/data-and-crud.md](references/data-and-crud.md)
    - Failure cases and guardrails: [references/known-failures.md](references/known-failures.md)
-   - Advanced patterns (reorder, resources, undo/redo, schema): [references/advanced-patterns.md](references/advanced-patterns.md)
+   - Advanced patterns (plugins, reorder, resources, baselines, critical path, zoom, undo/redo, schema): [references/advanced-patterns.md](references/advanced-patterns.md)
+   - Real-time / multi-user / external change streams (`gantt.ext.liveUpdates`): [references/live-updates.md](references/live-updates.md)
    - Styling, theming, CSS variables, selectors, and template-based visual customization: [references/styling-and-theming.md](references/styling-and-theming.md)
 4. Use DHTMLX MCP before relying on advanced or unfamiliar APIs.
 5. Implement with documented APIs only.
@@ -74,6 +75,10 @@ Consult DHTMLX MCP before using or changing:
 - working calendar rules and work-time helpers
 - lightbox section types and option-list patterns
 - CSS variable names beyond the current project usage
+- `gantt.plugins({...})` extension loading and the matching `gantt.ext.*` surfaces (critical path, marker, tooltip, keyboard navigation, undo, export, auto-scheduling)
+- locale and i18n customization via `gantt.i18n.setLocale` and `gantt.locale.labels.*`
+- baseline render templates and baseline data shape
+- `gantt.ext.liveUpdates` (`RemoteEvents`, `remoteUpdates`) and the multi-user backend WebSocket protocol
 
 ## Hard Rules
 
@@ -85,15 +90,18 @@ Consult DHTMLX MCP before using or changing:
 - Normalize date values before persistence.
 - Build backend payloads explicitly from normalized task/link models.
 - Return `{ id: databaseId }` or `{ tid: databaseId }` after creates when the backend assigns a real id.
-- Do not mix app-managed data and direct Gantt instance mutations unless synchronization is intentional.
+- When applying external changes via `gantt.addTask` / `updateTask` / `deleteTask` (or link/datastore equivalents), wrap them in `gantt.silent(...)` so they do not echo back through the DataProcessor.
 - Treat row reorder as a dedicated batch flow, not a normal single-task update.
+- Gantt template return values (`task_text`, `tooltip_text`, column `template`, scale formatters, etc.) are injected as raw HTML. Sanitize or HTML-escape every user-supplied string before it enters Gantt (or in the template) — never trust task text, descriptions, resource names, or any other free-text field to be safe.
+- When the installed package is `dhtmlx-gantt` (Standard/GPL) and the requested feature appears in the PRO-only list in [references/editions.md](references/editions.md), warn the user that the feature is PRO-only *before* scaffolding, then still scaffold the requested code. Do not silently substitute or omit it.
 
 ## Quick Checklist
 
 - [ ] Correct package identified
+- [ ] Edition determined and PRO-only usage flagged for Standard installs
 - [ ] Matching CSS import used
 - [ ] Explicit height provided
-- [ ] Data ownership model chosen
+- [ ] Outbound and inbound change strategies decided
 - [ ] Dates normalized before persistence
 - [ ] DataProcessor return values handled
 - [ ] Advanced APIs verified with MCP

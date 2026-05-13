@@ -1,19 +1,42 @@
 # Advanced Patterns
 
-Use this file when implementing row reorder, resource panels, undo/redo, working calendars, zoom, or designing a backend schema for Gantt data.
+Use this file when implementing plugins, row reorder, resource panels, baselines, critical path, undo/redo, working calendars, zoom, multi-instance pages, or designing a backend schema for Gantt data.
 
 ## Contents
+- Plugins And Extensions Loader
 - Row Reorder With Sortorder Persistence
-- Resource Panel And Workload Visualization
+- Resource Panel And Workload Visualization (**PRO only**)
+- Live Updates (`gantt.ext.liveUpdates`)
 - Working Calendar
 - Zoom
+- Baselines (**PRO only**)
+- Critical Path (**PRO only**)
+- Multiple Gantt Instances On One Page (**PRO only**)
 - Undo/Redo With State Management
 - Backend Schema Template
+
+## Plugins And Extensions Loader
+
+Many `gantt.ext.*` surfaces are gated behind `gantt.plugins({...})`. Enable the extensions a feature needs before `gantt.init`:
+
+```ts
+gantt.plugins({
+  critical_path: true,    // PRO only — enables gantt.config.highlight_critical_path
+  marker: true,           // gantt.ext.marker (timeline markers / today line)
+  tooltip: true,          // gantt.ext.tooltips
+  keyboard_navigation: true,
+  undo: true,             // gantt.ext.undo (Standard + PRO)
+  export_api: true,       // gantt.ext.export_api (PDF / PNG / Excel / MS Project)
+  auto_scheduling: true,  // PRO only
+});
+```
+
+Built-in zoom (`gantt.ext.zoom`) does not require a plugin enable in current versions. Verify with MCP if the extension is unfamiliar.
 
 ## Row Reorder With Sortorder Persistence
 
 - enable row ordering through documented Gantt config
-- verify reorder event names and signatures with MCP before wiring handlers
+- documented reorder events: `onRowDragStart`, `onBeforeRowDragMove`, `onBeforeRowDragEnd`, `onRowDragEnd` — verify exact signatures with MCP before wiring handlers
 - treat reorder as a dedicated flow
 - do not route reorder through the normal single-task update path
 - when a row moves, rebuild the full ordered task list in memory
@@ -27,6 +50,8 @@ Use this file when implementing row reorder, resource panels, undo/redo, working
 - ignore reorder persistence for temporary task ids
 
 ## Resource Panel And Workload Visualization
+
+**PRO only.** Resource management (resource grid, resource timeline, resource histogram, assignments, workload) is unavailable in Standard (`dhtmlx-gantt`). If the installed package is Standard, warn the user before scaffolding and still produce the requested code — see [editions.md](editions.md).
 
 - Gantt does not enforce a fixed task field for resource binding
 - the relation is defined by `gantt.config.resource_property`, and resource features use `task[gantt.config.resource_property]`
@@ -53,6 +78,39 @@ Layout:
 Notes:
 
 - resource datastore may require initialization after `gantt.init`
+- the resource and assignment datasets live in dedicated datastores reachable as `gantt.$data.resourcesStore` and `gantt.$data.assignmentsStore`. Use them for wholesale or incremental updates from external sources:
+
+```ts
+// wholesale replace
+gantt.$data.resourcesStore.clearAll();
+gantt.$data.resourcesStore.parse(resources);
+
+// incremental sync — wrap in gantt.silent to avoid notifying the DataProcessor
+gantt.silent(() => {
+  for (const a of addedAssignments)   gantt.$data.assignmentsStore.addItem(a);
+  for (const a of updatedAssignments) gantt.$data.assignmentsStore.updateItem(a.id, a);
+  for (const id of removedIds)        if (gantt.$data.assignmentsStore.exists(id)) gantt.$data.assignmentsStore.removeItem(id);
+});
+```
+
+- `gantt.serverList(name, list)` is the canonical way to register named lookup lists used by lightbox `select` sections and resource dropdowns. Register lists *before* `gantt.init` and reference them in the lightbox config:
+
+```ts
+gantt.serverList("staff", [
+  { key: 1, label: "John" },
+  { key: 2, label: "Mike" },
+]);
+
+gantt.config.lightbox.sections = [
+  { name: "description", height: 70, map_to: "text", type: "textarea" },
+  { name: "owner", map_to: "owner_id", type: "select", options: gantt.serverList("staff") },
+  { name: "time", type: "duration", map_to: "auto" },
+];
+
+gantt.init("gantt_here");
+```
+
+`gantt.serverList(name)` returns a live reference to the same array, so mutations propagate to any UI that reads it (after `gantt.refreshData()` or `gantt.render()`).
 
 ### Supported Resource Binding Models
 
@@ -88,6 +146,12 @@ Separate assignments list:
 }
 ```
 
+## Live Updates (`gantt.ext.liveUpdates`)
+
+For real-time collaboration, server push, or any external change stream, use `gantt.ext.liveUpdates`. The extension exposes `remoteUpdates` (apply task/link change messages without notifying the DataProcessor) and `RemoteEvents` (WebSocket client speaking the documented multi-user backend protocol). Works in Standard and PRO.
+
+Both integration modes — native multi-user backend and custom change source like Firestore or an app socket — and the echo-loop guard are covered in [live-updates.md](live-updates.md).
+
 ## Working Calendar
 
 - keep one source of truth for working and non-working time rules
@@ -116,24 +180,114 @@ gantt.templates.scale_cell_class = (date) =>
 
 ## Zoom
 
-Use the built-in zoom extension for multi-level zoom:
+Use the built-in zoom extension for multi-level zoom. Each level is a full configuration block — `name`, `scale_height`, `min_column_width`, and a `scales` array of `{ unit, step, format }`:
 
 ```ts
-gantt.ext.zoom.init({ levels: [...] });
+gantt.ext.zoom.init({
+  levels: [
+    {
+      name: "day",
+      scale_height: 50,
+      min_column_width: 80,
+      scales: [
+        { unit: "week", step: 1, format: "Week #%W" },
+        { unit: "day",  step: 1, format: "%d %M" },
+      ],
+    },
+    {
+      name: "month",
+      scale_height: 50,
+      min_column_width: 120,
+      scales: [
+        { unit: "year",  step: 1, format: "%Y" },
+        { unit: "month", step: 1, format: "%F" },
+      ],
+    },
+  ],
+});
+
 gantt.ext.zoom.setLevel("day");
 ```
 
-Common zoom levels:
-- `hour`
-- `day`
-- `week`
-- `month`
-- `year`
+Common zoom level names: `hour`, `day`, `week`, `month`, `year`.
 
 For manual zoom (without the extension):
 - update `gantt.config.scales`
 - call `gantt.render()` after changes
 
+
+## Baselines
+
+**PRO only.** Baselines, deadlines, and similar custom timeline elements are PRO features. On Standard installs, warn the user before scaffolding and still produce the requested code — see [editions.md](editions.md).
+
+Inbuilt baselines (added in v9.0) render planned-vs-actual bars alongside each task automatically once enabled and loaded — no custom render template is required.
+
+**Data shape.** Baselines are loaded as a **top-level** array in `gantt.parse(...)`, alongside `tasks` and `links`. Each entry has its own `id` and references the task via `task_id`:
+
+```ts
+gantt.parse({
+  tasks: [
+    { id: 1, text: "Task #1", start_date: "2026-05-04", duration: 5, parent: 0 },
+    { id: 2, text: "Task #2", start_date: "2026-05-10", duration: 3, parent: 0 },
+  ],
+  links: [],
+  baselines: [
+    { id: 1, task_id: 1, start_date: "2026-05-03", duration: 4, end_date: "2026-05-07" },
+    { id: 2, task_id: 2, start_date: "2026-05-09", duration: 4, end_date: "2026-05-13" },
+  ],
+});
+```
+
+Baselines live in their own datastore named `"baselines"` and are reachable via `gantt.getDatastore("baselines")`.
+
+**Config:**
+
+```ts
+gantt.config.baselines = {
+  datastore: "baselines",      // name of the baseline datastore
+  render_mode: "separateRow",  // "taskRow" | "separateRow" | "individualRow" | false (disable)
+  dataprocessor_baselines: false, // true → baseline writes flow through the DataProcessor as separate entries
+  row_height: 16,              // height of the baseline subrow (used by separateRow / individualRow)
+  bar_height: 8,               // height of the baseline bar
+};
+```
+
+The three render modes:
+- `"taskRow"` — baseline drawn in the same row as the task bar.
+- `"separateRow"` — all baselines for a task drawn together in a subrow below the task, expanding the row height.
+- `"individualRow"` — each baseline in its own subrow.
+
+`gantt.config.baselines = false` disables the feature entirely.
+
+For the full surface (lightbox `{type: "baselines"}` section, `gantt.getTaskBaselines(id)`, `gantt.adjustTaskHeightForBaselines(task)` after dynamic config changes, the `baseline_text` template, and the `addTaskLayer` custom-rendering alternative) see <https://docs.dhtmlx.com/gantt/guides/inbuilt-baselines/>.
+
+## Critical Path
+
+**PRO only.** Critical path calculation is a PRO feature, gated through `gantt.plugins({ critical_path: true })`. On Standard installs, warn the user and still produce code.
+
+```ts
+gantt.plugins({ critical_path: true });
+gantt.config.highlight_critical_path = true;
+```
+
+Critical bars and links pick up `gantt_critical_task` / `gantt_critical_link` classes. Avoid combining critical highlighting with inline color shortcut fields (`task.color`, `link.color`) — inline styles will override the critical-path class.
+
+## Multiple Gantt Instances On One Page
+
+**PRO only** (Commercial since Oct 6 2021, Enterprise, Ultimate). Use the factory pattern:
+
+```ts
+import { Gantt } from "@dhx/gantt";
+const ganttA = Gantt.getGanttInstance();
+const ganttB = Gantt.getGanttInstance();
+
+ganttA.init("ganttA_here");
+ganttB.init("ganttB_here");
+```
+
+Each instance has its own `config`, `templates`, events, and DataProcessor. Do not import the singleton `gantt` and a factory instance in the same module — wire each feature against a single chosen reference.
+
+On Standard, fall back to a single instance.
 
 ## Undo/Redo With State Management
 
